@@ -1,0 +1,11 @@
+StartCase:	1
+EndCase:	4000000
+Edit distance hist:
+0	2385
+guess substitutions:	0
+guess deletions:	0
+guess insertions:	0
+guess edit dist:	0
+Error rate:	0
+Success rate:	1
+number of majority test 2385
