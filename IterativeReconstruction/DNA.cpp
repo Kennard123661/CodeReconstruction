@@ -37,12 +37,11 @@ vector<string> readDNAFile(string inputFilename) {
     vector<string> strands;
     string line;
 
-    cout << inputFilename;
+    //    cout << inputFilename;
     ifstream ReadFile(inputFilename);
 
     while (getline(ReadFile, line)) {
-        cout << line << 'line' << endl;
-        return 0;
+        cout << line << " line" << endl;
         strands.push_back(line);
     }
 
@@ -58,16 +57,22 @@ auto loadDataset(string datasetDir, unsigned int numStrands) {
     };
 
     string refFile = datasetDir + OS_SEP + "reference.txt";
+    cout << refFile;
     vector<string> refStrands = readDNAFile(refFile);
-
     vector<vector<string>> readStrands;
+
     for (unsigned int i = 0; i < numStrands; i++) {
         string readFile = datasetDir + OS_SEP + to_string(i) + ".txt";
         vector<string> readCluster = readDNAFile(readFile);
         readStrands.push_back(readCluster);
     }
-    // printVector(readStrands);
    return dnaDataset {refStrands, readStrands};
+}
+
+
+void TestDataset(vector<string> refStrands, vector<vector<string>> readStrands)
+{
+    
 }
 
 
@@ -417,8 +422,12 @@ int main() {
 
 	double delProb;
 //    string infile = "/mnt/Data/project-storage/deep-trace/datasets/synthetic/synthetic-100-15/0.txt";
-    string datasetDir = "/mnt/Data/project-storage/deep-trace/datasets/synthetic/synthetic-100-15";
+//    string datasetDir = "/mnt/Data/project-storage/deep-trace/datasets/synthetic/synthetic-100-15";
+    string datasetDir = "/home/kennardngpoolhua/project-storage/deep-trace/datasets/synthetic/synthetic-150-5";
+//    cout << "hi" << endl;
+//    return 0;
     auto [refStrands, readStrands] = loadDataset(datasetDir, 60000);
+//    printVector(refStrands);
     // readDNAFile(infile);
     return 0;
 
