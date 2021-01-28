@@ -7,6 +7,7 @@
 //============================================================================
 
 #include <iostream>
+#include <fstream>
 #include <chrono>
 #include <fstream>
 #include <cassert>
@@ -17,12 +18,65 @@
 #include "EditDistance.hpp"
 using namespace std;
 
+#ifdef WIN32
+#define OS_SEP '\\'
+#else
+#define OS_SEP '/'
+#endif
+
+
+void printVector(std:: vector<string> const &input) {
+    for (unsigned int i = 0; i < input.size(); i++) {
+        cout << input.at(i) << endl;
+    }
+}
+
+
+vector<string> readDNAFile(string inputFilename) {
+// vector<string> readDNAFile(string inputFilename) {
+    vector<string> strands;
+    string line;
+
+    cout << inputFilename;
+    ifstream ReadFile(inputFilename);
+
+    while (getline(ReadFile, line)) {
+        cout << line << 'line' << endl;
+        return 0;
+        strands.push_back(line);
+    }
+
+    ReadFile.close();
+    return strands;
+}
+
+
+auto loadDataset(string datasetDir, unsigned int numStrands) {
+    struct dnaDataset {
+        vector<string> refs;
+        vector<vector<string>> reads;
+    };
+
+    string refFile = datasetDir + OS_SEP + "reference.txt";
+    vector<string> refStrands = readDNAFile(refFile);
+
+    vector<vector<string>> readStrands;
+    for (unsigned int i = 0; i < numStrands; i++) {
+        string readFile = datasetDir + OS_SEP + to_string(i) + ".txt";
+        vector<string> readCluster = readDNAFile(readFile);
+        readStrands.push_back(readCluster);
+    }
+    // printVector(readStrands);
+   return dnaDataset {refStrands, readStrands};
+}
+
+
 void TestFixAll(int testNum, int strandLen, int cloneNum, int delPatternLen, const int subPriority,
 		const int delPriority, const int insPriority, const int maxReps, const double delProb, const double insProb,
 		const double subProb) {
 	unsigned sd = chrono::high_resolution_clock::now().time_since_epoch().count();
 	mt19937 generator(sd);
-
+    cout << testNum << endl;
 	int cumTotalFinalGuessEditDist = 0, roundFinalGuessEditDist = 0;
 	int cumFinalGuessSubstitutions = 0, cumFinalGuessInsertions = 0, cumFinalGuessDeletions = 0;
 	map<int, int> editDistanceHist;
@@ -160,6 +214,7 @@ void TestFromFile(const string& inputFilename, int testNum, int strandLen, int m
 	map<int, int> editDistanceHist;
 
 	int countFiltered = 0;
+	cout << testNum;
 	for (int i = 1; i <= testNum; i++) {
 		GetCase(input, original, copies, maxCopies);
 //		set<int>::iterator it = filter.find(i);
@@ -361,8 +416,13 @@ int main() {
 //				maxReps);
 
 	double delProb;
+//    string infile = "/mnt/Data/project-storage/deep-trace/datasets/synthetic/synthetic-100-15/0.txt";
+    string datasetDir = "/mnt/Data/project-storage/deep-trace/datasets/synthetic/synthetic-100-15";
+    auto [refStrands, readStrands] = loadDataset(datasetDir, 60000);
+    // readDNAFile(infile);
+    return 0;
 
-	delProb = 0.005;
+	delProb = 0.05;
 	cout << "Test num:\t" << testNum << endl;
 	cout << "Strand len:\t" << strandLen << endl;
 	cout << "Cluster size:\t" << cloneNum << endl;
@@ -385,5 +445,9 @@ int main() {
 	double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
 	cout << endl;
 	cout << "Time elapsed: " << (int) elapsed_secs << "\tseconds" << endl;
+
+//    string infile = "/mnt/Data/project-storage/deep-trace/datasets/synthetic/synthetic-100-15/0.txt";
+
+//	readDNAFile(in_file)
 	return 0;
 }
