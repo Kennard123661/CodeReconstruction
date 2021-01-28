@@ -70,9 +70,48 @@ auto loadDataset(string datasetDir, unsigned int numStrands) {
 }
 
 
-void TestDataset(vector<string> refStrands, vector<vector<string>> readStrands)
+void testDataset(vector<string> refStrands, vector<vector<string>> readStrands, unsigned int numStrands,
+                 int delPatternLen, const int subPriority,
+                 const int delPriority, const int insPriority, const int maxReps,
+                 const double delProb, const double insProb,
+                 const double subProb, unsigned int strandLen)
 {
-    
+    unsigned sd = chrono::high_resolution_clock::now().time_since_epoch().count();
+    mt19937 generator(sd);
+    int cumTotalFinalGuessEditDist = 0, roundFinalGuessEditDist = 0;
+    int cumFinalGuessSubstitutions = 0, cumFinalGuessInsertions = 0, cumFinalGuessDeletions = 0;
+    map<int, int> editDistanceHist;
+
+    for (unsigned int i = 0; i < numStrands; i++) {
+        string refStrand = refStrands.at(i);
+        vector<string> readCluster = readStrands.at(i);
+        Cluster2 cluster(refStrand, readCluster);
+        string finalGuess = cluster.TestBest(delPatternLen, roundFinalGuessEditDist, subPriority, delPriority,
+                                             insPriority, generator, maxReps);
+        roundFinalGuessEditDist = ComputeEditDistanceNum(cluster.Original(), finalGuess);
+        editDistanceHist[roundFinalGuessEditDist]++;
+        cumTotalFinalGuessEditDist += roundFinalGuessEditDist;
+
+        vector<LetterOps> result = ComputeEditDistancePriority(finalGuess, cluster.Original(), 0, generator);
+        map<string, double> countOperations = CountOperations(result);
+        assert(countOperations["I"] + countOperations["D"] + countOperations["R"] == roundFinalGuessEditDist);
+
+        cumFinalGuessSubstitutions += countOperations["R"];
+        cumFinalGuessInsertions += countOperations["I"];
+        cumFinalGuessDeletions += countOperations["D"];
+    }
+    map<int, int>::reverse_iterator rit = editDistanceHist.rbegin(); // points to last element in map
+    int highestED = rit->first;
+    int cumDist = 0;
+    cout << "Edit distance hist:" << endl;
+    for (int i = 0; i <= highestED; i++) {
+        cumDist += editDistanceHist[i];
+        cout << i << "\t" << cumDist << endl;
+    }
+    cout << "Avg. guess substitutions:\t" << 1000 * (double) cumFinalGuessSubstitutions / (numStrands * strandLen) << endl;
+    cout << "Avg. guess deletions:\t" << 1000 * (double) cumFinalGuessDeletions / (numStrands * strandLen) << endl;
+    cout << "Avg. guess insertions:\t" << 1000 * (double) cumFinalGuessInsertions / (numStrands * strandLen) << endl;
+    cout << "Avg. guess edit dist:\t" << 1000 * (double) cumTotalFinalGuessEditDist / (numStrands * strandLen) << endl;
 }
 
 
@@ -427,6 +466,8 @@ int main() {
 //    cout << "hi" << endl;
 //    return 0;
     auto [refStrands, readStrands] = loadDataset(datasetDir, 60000);
+    testDataset(refStrands, readStrands, 60000, delPatternLen, subPriority, delPriority, insPriority, maxReps,
+                delProb, delProb, delProb, 100);
 //    printVector(refStrands);
     // readDNAFile(infile);
     return 0;
