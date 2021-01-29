@@ -79,11 +79,11 @@ auto loadDataset(string datasetDir, unsigned int numStrands) {
 }
 
 
-vector<string> testDataset(vector<string> refStrands, vector<vector<string>> readStrands, unsigned int numStrands,
-                           int delPatternLen, const int subPriority,
-                           const int delPriority, const int insPriority, const int maxReps,
-                           const double delProb, const double insProb,
-                           const double subProb, unsigned int strandLen)
+vector<string> inferenceDataset(vector<string> refStrands, vector<vector<string>> readStrands, unsigned int numStrands,
+                                int delPatternLen, const int subPriority,
+                                const int delPriority, const int insPriority, const int maxReps,
+                                const double delProb, const double insProb,
+                                const double subProb, unsigned int strandLen)
 {
     unsigned sd = chrono::high_resolution_clock::now().time_since_epoch().count();
     mt19937 generator(sd);
@@ -109,31 +109,31 @@ vector<string> testDataset(vector<string> refStrands, vector<vector<string>> rea
                                              insPriority, generator, maxReps);
         reconstructed.at(i).push_back(finalGuess);
 
-        roundFinalGuessEditDist = ComputeEditDistanceNum(cluster.Original(), finalGuess);
-        editDistanceHist[roundFinalGuessEditDist]++;
-        cumTotalFinalGuessEditDist += roundFinalGuessEditDist;
-
-        vector<LetterOps> result = ComputeEditDistancePriority(finalGuess, cluster.Original(), 0, generator);
-        map<string, double> countOperations = CountOperations(result);
-        assert(countOperations["I"] + countOperations["D"] + countOperations["R"] == roundFinalGuessEditDist);
-
-        cumFinalGuessSubstitutions += countOperations["R"];
-        cumFinalGuessInsertions += countOperations["I"];
-        cumFinalGuessDeletions += countOperations["D"];
+//        roundFinalGuessEditDist = ComputeEditDistanceNum(cluster.Original(), finalGuess);
+//        editDistanceHist[roundFinalGuessEditDist]++;
+//        cumTotalFinalGuessEditDist += roundFinalGuessEditDist;
+//
+//        vector<LetterOps> result = ComputeEditDistancePriority(finalGuess, cluster.Original(), 0, generator);
+//        map<string, double> countOperations = CountOperations(result);
+//        assert(countOperations["I"] + countOperations["D"] + countOperations["R"] == roundFinalGuessEditDist);
+//
+//        cumFinalGuessSubstitutions += countOperations["R"];
+//        cumFinalGuessInsertions += countOperations["I"];
+//        cumFinalGuessDeletions += countOperations["D"];
     }
 
-    map<int, int>::reverse_iterator rit = editDistanceHist.rbegin(); // points to last element in map
-    int highestED = rit->first;
-    int cumDist = 0;
-    cout << "Edit distance hist:" << endl;
-    for (int i = 0; i <= highestED; i++) {
-        cumDist += editDistanceHist[i];
-        cout << i << "\t" << cumDist << endl;
-    }
-    cout << "Avg. guess substitutions:\t" << 1000 * (double) cumFinalGuessSubstitutions / (numStrands * strandLen) << endl;
-    cout << "Avg. guess deletions:\t" << 1000 * (double) cumFinalGuessDeletions / (numStrands * strandLen) << endl;
-    cout << "Avg. guess insertions:\t" << 1000 * (double) cumFinalGuessInsertions / (numStrands * strandLen) << endl;
-    cout << "Avg. guess edit dist:\t" << 1000 * (double) cumTotalFinalGuessEditDist / (numStrands * strandLen) << endl;
+//    map<int, int>::reverse_iterator rit = editDistanceHist.rbegin(); // points to last element in map
+//    int highestED = rit->first;
+//    int cumDist = 0;
+//    cout << "Edit distance hist:" << endl;
+//    for (int i = 0; i <= highestED; i++) {
+//        cumDist += editDistanceHist[i];
+//        cout << i << "\t" << cumDist << endl;
+//    }
+//    cout << "Avg. guess substitutions:\t" << 1000 * (double) cumFinalGuessSubstitutions / (numStrands * strandLen) << endl;
+//    cout << "Avg. guess deletions:\t" << 1000 * (double) cumFinalGuessDeletions / (numStrands * strandLen) << endl;
+//    cout << "Avg. guess insertions:\t" << 1000 * (double) cumFinalGuessInsertions / (numStrands * strandLen) << endl;
+//    cout << "Avg. guess edit dist:\t" << 1000 * (double) cumTotalFinalGuessEditDist / (numStrands * strandLen) << endl;
 
     vector<string> reconstructedStrands;
     for (unsigned int i = 0; i < numStrands; i++)
@@ -506,27 +506,37 @@ int main() {
 //				maxReps);
 
 	double delProb;
-//    string infile = "/mnt/Data/project-storage/deep-trace/datasets/synthetic/synthetic-100-15/0.txt";
-    string baseDatasetDir = "/mnt/Data/project-storage/deep-trace/datasets/synthetic";
-    string baseSaveDir = "/mnt/Data/project-storage/CodeReconstruction/IterativeReconstruction/results";
+    unsigned int numStrands = 60000;
+//    string baseDatasetDir = "/mnt/Data/project-storage/deep-trace/datasets/synthetic";
+//    string baseSaveDir = "/mnt/Data/project-storage/CodeReconstruction/IterativeReconstruction/results";
+    string baseDatasetDir = "/home/e/e0036319/project-storage/deep-trace/datasets/synthetic";
+    string baseSaveDir = "/home/e/e0036319/project-storage/CodeReconstruction/IterativeReconstruction/results";
 
-    string datasetName = "synthetic-100-15";
-    string datasetDir = baseDatasetDir + OS_SEP + datasetName;
-    string saveFile = baseSaveDir + OS_SEP + datasetName + ".txt";
+    vector<int> errorRates {15, 10, 5};
+    vector<int> refLengths {100, 120, 150, 180};
+    for (unsigned int i = 0; i < 3; i++)
+    {
+        for (unsigned int j = 0; j < 4; j++)
+        {
+            int errorRate = errorRates.at(i);
+            int refLength = refLengths.at(j);
 
-//    string datasetDir = "/mnt/Data/project-storage/deep-trace/datasets/synthetic/synthetic-100-15";
-//    string datasetDir = "/home/kennardngpoolhua/project-storage/deep-trace/datasets/synthetic/synthetic-150-5";
-//    return 0;
-    unsigned int numStrands = 1000;
+            string datasetName = "synthetic-" + to_string(refLength) + "-" + to_string(errorRate);
+            string datasetDir = baseDatasetDir + OS_SEP + datasetName;
+            string saveFile = baseSaveDir + OS_SEP + datasetName + ".txt";
+            cout << datasetName << endl;
+            cout << "INFO: reading strands for " + datasetName << endl;
+            auto [refStrands, readStrands] = loadDataset(datasetDir, numStrands);
 
-    auto [refStrands, readStrands] = loadDataset(datasetDir, numStrands);
-    cout << to_string(refStrands.size()) << endl;
-    vector<string> reconstructedStrands = testDataset(refStrands, readStrands, numStrands, delPatternLen, subPriority,
-                                                      delPriority, insPriority, maxReps,
-                                                      delProb, delProb, delProb, 100);
-    writeReconstructedFile(reconstructedStrands, saveFile);
-//    printVector(refStrands);
-    // readDNAFile(infile);
+            cout << "INFO: running evaluation for " + datasetName << endl;
+            vector<string> reconstructedStrands = inferenceDataset(refStrands, readStrands, numStrands,
+                                                                   delPatternLen, subPriority,
+                                                                   delPriority, insPriority, maxReps,
+                                                                   delProb, delProb, delProb, 100);
+            writeReconstructedFile(reconstructedStrands, saveFile);
+            cout << "INFO: finished evaluation for " + datasetName << endl;
+        }
+    }
     return 0;
 
 	delProb = 0.05;
