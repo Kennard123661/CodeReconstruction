@@ -16,7 +16,6 @@
 #include "Cluster2.hpp"
 #include "LongestPath.hpp"
 #include "EditDistance.hpp"
-#include <boost/filesystem.hpp>
 using namespace std;
 
 #ifdef WIN32
