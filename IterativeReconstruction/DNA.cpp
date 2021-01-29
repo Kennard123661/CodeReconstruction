@@ -16,6 +16,7 @@
 #include "Cluster2.hpp"
 #include "LongestPath.hpp"
 #include "EditDistance.hpp"
+#include <boost/filesystem.hpp>
 using namespace std;
 
 #ifdef WIN32
@@ -41,7 +42,6 @@ vector<string> readDNAFile(string inputFilename) {
     ifstream ReadFile(inputFilename);
 
     while (getline(ReadFile, line)) {
-        cout << line << " line" << endl;
         strands.push_back(line);
     }
 
@@ -57,24 +57,33 @@ auto loadDataset(string datasetDir, unsigned int numStrands) {
     };
 
     string refFile = datasetDir + OS_SEP + "reference.txt";
-    cout << refFile;
     vector<string> refStrands = readDNAFile(refFile);
     vector<vector<string>> readStrands;
 
     for (unsigned int i = 0; i < numStrands; i++) {
+        vector<string> emptyReadCluster;
+        readStrands.push_back(emptyReadCluster);
+    }
+
+    #pragma omp parallel for
+    for (unsigned int i = 0; i < numStrands; i++) {
+//        cout << to_string(i) << endl;
         string readFile = datasetDir + OS_SEP + to_string(i) + ".txt";
         vector<string> readCluster = readDNAFile(readFile);
-        readStrands.push_back(readCluster);
-    }
+
+        for (unsigned int j = 0; j < readCluster.size(); j++) {
+            readStrands.at(i).push_back(readCluster.at(j));
+        }
+    };
    return dnaDataset {refStrands, readStrands};
 }
 
 
-void testDataset(vector<string> refStrands, vector<vector<string>> readStrands, unsigned int numStrands,
-                 int delPatternLen, const int subPriority,
-                 const int delPriority, const int insPriority, const int maxReps,
-                 const double delProb, const double insProb,
-                 const double subProb, unsigned int strandLen)
+vector<string> testDataset(vector<string> refStrands, vector<vector<string>> readStrands, unsigned int numStrands,
+                           int delPatternLen, const int subPriority,
+                           const int delPriority, const int insPriority, const int maxReps,
+                           const double delProb, const double insProb,
+                           const double subProb, unsigned int strandLen)
 {
     unsigned sd = chrono::high_resolution_clock::now().time_since_epoch().count();
     mt19937 generator(sd);
@@ -82,12 +91,24 @@ void testDataset(vector<string> refStrands, vector<vector<string>> readStrands, 
     int cumFinalGuessSubstitutions = 0, cumFinalGuessInsertions = 0, cumFinalGuessDeletions = 0;
     map<int, int> editDistanceHist;
 
+    cout << "INFO: running evaluation..." << endl;
+    vector<vector<string>> reconstructed;
+    for (unsigned int i = 0; i < numStrands; i++)
+    {
+        vector<string> reconString;
+        reconstructed.push_back(reconString);
+    }
+
+    #pragma omp parallel for
     for (unsigned int i = 0; i < numStrands; i++) {
         string refStrand = refStrands.at(i);
         vector<string> readCluster = readStrands.at(i);
+
         Cluster2 cluster(refStrand, readCluster);
         string finalGuess = cluster.TestBest(delPatternLen, roundFinalGuessEditDist, subPriority, delPriority,
                                              insPriority, generator, maxReps);
+        reconstructed.at(i).push_back(finalGuess);
+
         roundFinalGuessEditDist = ComputeEditDistanceNum(cluster.Original(), finalGuess);
         editDistanceHist[roundFinalGuessEditDist]++;
         cumTotalFinalGuessEditDist += roundFinalGuessEditDist;
@@ -100,6 +121,7 @@ void testDataset(vector<string> refStrands, vector<vector<string>> readStrands, 
         cumFinalGuessInsertions += countOperations["I"];
         cumFinalGuessDeletions += countOperations["D"];
     }
+
     map<int, int>::reverse_iterator rit = editDistanceHist.rbegin(); // points to last element in map
     int highestED = rit->first;
     int cumDist = 0;
@@ -112,6 +134,13 @@ void testDataset(vector<string> refStrands, vector<vector<string>> readStrands, 
     cout << "Avg. guess deletions:\t" << 1000 * (double) cumFinalGuessDeletions / (numStrands * strandLen) << endl;
     cout << "Avg. guess insertions:\t" << 1000 * (double) cumFinalGuessInsertions / (numStrands * strandLen) << endl;
     cout << "Avg. guess edit dist:\t" << 1000 * (double) cumTotalFinalGuessEditDist / (numStrands * strandLen) << endl;
+
+    vector<string> reconstructedStrands;
+    for (unsigned int i = 0; i < numStrands; i++)
+    {
+        reconstructedStrands.push_back(reconstructed.at(i).at(0));
+    }
+    return reconstructedStrands;
 }
 
 
@@ -125,6 +154,7 @@ void TestFixAll(int testNum, int strandLen, int cloneNum, int delPatternLen, con
 	int cumFinalGuessSubstitutions = 0, cumFinalGuessInsertions = 0, cumFinalGuessDeletions = 0;
 	map<int, int> editDistanceHist;
 
+	#pragma omp parallel for
 	for (int i = 0; i < testNum; i++) {
 		Cluster2 cluster(strandLen, cloneNum, delProb, insProb, subProb, generator);
 
@@ -427,6 +457,22 @@ void CasesStats(const string& inputFilename, const int maxCopies, const double E
 	input.close();
 }
 
+
+void writeReconstructedFile(vector<string> reconStrands, string saveFile)
+{
+    ofstream myfile (saveFile);
+    if (myfile.is_open())
+    {
+
+        for (unsigned int i = 0; i < reconStrands.size(); i++)
+        {
+            myfile << reconStrands.at(i) << endl;
+        }
+        myfile.close();
+    }
+    else cout << "Unable to open file";
+}
+
 // TODO:	decide fix order by copy len. too long -> prioritize fix inserts, too short -> prioritize fix deletions
 
 int main() {
@@ -461,13 +507,24 @@ int main() {
 
 	double delProb;
 //    string infile = "/mnt/Data/project-storage/deep-trace/datasets/synthetic/synthetic-100-15/0.txt";
+    string baseDatasetDir = "/mnt/Data/project-storage/deep-trace/datasets/synthetic";
+    string baseSaveDir = "/mnt/Data/project-storage/CodeReconstruction/IterativeReconstruction/results";
+
+    string datasetName = "synthetic-100-15";
+    string datasetDir = baseDatasetDir + OS_SEP + datasetName;
+    string saveFile = baseSaveDir + OS_SEP + datasetName + ".txt";
+
 //    string datasetDir = "/mnt/Data/project-storage/deep-trace/datasets/synthetic/synthetic-100-15";
-    string datasetDir = "/home/kennardngpoolhua/project-storage/deep-trace/datasets/synthetic/synthetic-150-5";
-//    cout << "hi" << endl;
+//    string datasetDir = "/home/kennardngpoolhua/project-storage/deep-trace/datasets/synthetic/synthetic-150-5";
 //    return 0;
-    auto [refStrands, readStrands] = loadDataset(datasetDir, 60000);
-    testDataset(refStrands, readStrands, 60000, delPatternLen, subPriority, delPriority, insPriority, maxReps,
-                delProb, delProb, delProb, 100);
+    unsigned int numStrands = 1000;
+
+    auto [refStrands, readStrands] = loadDataset(datasetDir, numStrands);
+    cout << to_string(refStrands.size()) << endl;
+    vector<string> reconstructedStrands = testDataset(refStrands, readStrands, numStrands, delPatternLen, subPriority,
+                                                      delPriority, insPriority, maxReps,
+                                                      delProb, delProb, delProb, 100);
+    writeReconstructedFile(reconstructedStrands, saveFile);
 //    printVector(refStrands);
     // readDNAFile(infile);
     return 0;
